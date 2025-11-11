@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,23 +25,33 @@ import {
   Upload, 
   Search,
   Filter,
-  X
+  X,
+  Loader2
 } from "lucide-react";
+import { useLeads } from "@/hooks/useLeads";
+import { useBrokers } from "@/hooks/useBrokers";
 
-// Mock data
-const allLeads = [
-  { id: 1, name: "Ana Paula Silva", email: "ana.paula@email.com", phone: "(11) 98765-4321", status: "Em Negociação", origin: "Facebook Ads", broker: "Rafael Costa", date: "2024-01-10" },
-  { id: 2, name: "Carlos Lima", email: "carlos.lima@email.com", phone: "(11) 97654-3210", status: "Em Atendimento", origin: "WhatsApp", broker: "Marina Santos", date: "2024-01-12" },
-  { id: 3, name: "Fernanda Dias", email: "fernanda.d@email.com", phone: "(11) 96543-2109", status: "Em Atendimento", origin: "Instagram", broker: "Rafael Costa", date: "2024-01-13" },
-  { id: 4, name: "Roberto Alves", email: "roberto.alves@email.com", phone: "(11) 95432-1098", status: "Visita Agendada", origin: "Google Ads", broker: "Lucas Mendes", date: "2024-01-14" },
-  { id: 5, name: "Julia Santos", email: "julia.santos@email.com", phone: "(11) 94321-0987", status: "Em Negociação", origin: "Indicação", broker: "Marina Santos", date: "2024-01-15" },
-  { id: 6, name: "Pedro Costa", email: "pedro.costa@email.com", phone: "(11) 93210-9876", status: "Novo Lead", origin: "Site", broker: "Rafael Costa", date: "2024-01-16" },
-  { id: 7, name: "Mariana Souza", email: "mariana.s@email.com", phone: "(11) 92109-8765", status: "Novo Lead", origin: "Facebook Ads", broker: "Lucas Mendes", date: "2024-01-17" },
-];
-
-const statusOptions = ["Todos", "Novo Lead", "Em Atendimento", "Visita Agendada", "Em Negociação", "Venda", "Perdido"];
-const originOptions = ["Todas", "Facebook Ads", "Instagram", "Google Ads", "WhatsApp", "Site", "Indicação"];
-const brokerOptions = ["Todos", "Rafael Costa", "Marina Santos", "Lucas Mendes"];
+const statusOptions = ["Todos", "novo", "contatado", "qualificado", "visita_agendada", "proposta_enviada", "negociacao", "fechado", "perdido"];
+const originOptions = ["Todas", "site", "indicacao", "facebook", "instagram", "google", "whatsapp", "outro"];
+const statusLabels: Record<string, string> = {
+  "novo": "Novo Lead",
+  "contatado": "Contatado",
+  "qualificado": "Qualificado",
+  "visita_agendada": "Visita Agendada",
+  "proposta_enviada": "Proposta Enviada",
+  "negociacao": "Negociação",
+  "fechado": "Fechado",
+  "perdido": "Perdido"
+};
+const originLabels: Record<string, string> = {
+  "site": "Site",
+  "indicacao": "Indicação",
+  "facebook": "Facebook",
+  "instagram": "Instagram",
+  "google": "Google",
+  "whatsapp": "WhatsApp",
+  "outro": "Outro"
+};
 
 export default function Leads() {
   const navigate = useNavigate();
@@ -50,19 +60,38 @@ export default function Leads() {
   const [originFilter, setOriginFilter] = useState("Todas");
   const [brokerFilter, setBrokerFilter] = useState("Todos");
 
-  // Aplicar filtros
-  const filteredLeads = allLeads.filter((lead) => {
-    const matchesSearch = 
-      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone.includes(searchTerm);
-    
-    const matchesStatus = statusFilter === "Todos" || lead.status === statusFilter;
-    const matchesOrigin = originFilter === "Todas" || lead.origin === originFilter;
-    const matchesBroker = brokerFilter === "Todos" || lead.broker === brokerFilter;
+  const { data: leads, isLoading } = useLeads();
+  const { data: brokers } = useBrokers();
 
-    return matchesSearch && matchesStatus && matchesOrigin && matchesBroker;
-  });
+  const brokerMap = useMemo(() => {
+    if (!brokers) return {};
+    return brokers.reduce((acc, broker) => {
+      acc[broker.id] = broker.name;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [brokers]);
+
+  const brokerOptions = useMemo(() => {
+    if (!brokers) return ["Todos"];
+    return ["Todos", ...brokers.map(b => b.id)];
+  }, [brokers]);
+
+  const filteredLeads = useMemo(() => {
+    if (!leads) return [];
+    
+    return leads.filter((lead) => {
+      const matchesSearch = 
+        lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        lead.phone.includes(searchTerm);
+      
+      const matchesStatus = statusFilter === "Todos" || lead.status === statusFilter;
+      const matchesOrigin = originFilter === "Todas" || lead.origin === originFilter;
+      const matchesBroker = brokerFilter === "Todos" || lead.assigned_broker_id === brokerFilter;
+
+      return matchesSearch && matchesStatus && matchesOrigin && matchesBroker;
+    });
+  }, [leads, searchTerm, statusFilter, originFilter, brokerFilter]);
 
   const hasActiveFilters = statusFilter !== "Todos" || originFilter !== "Todas" || brokerFilter !== "Todos";
 
@@ -75,12 +104,14 @@ export default function Leads() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      "Novo Lead": "bg-blue-500/10 text-blue-500",
-      "Em Atendimento": "bg-yellow-500/10 text-yellow-500",
-      "Visita Agendada": "bg-purple-500/10 text-purple-500",
-      "Em Negociação": "bg-orange-500/10 text-orange-500",
-      "Venda": "bg-green-500/10 text-green-500",
-      "Perdido": "bg-red-500/10 text-red-500",
+      "novo": "bg-info/10 text-info",
+      "contatado": "bg-primary/10 text-primary",
+      "qualificado": "bg-accent/10 text-accent",
+      "visita_agendada": "bg-warning/10 text-warning",
+      "proposta_enviada": "bg-warning/10 text-warning",
+      "negociacao": "bg-warning/10 text-warning",
+      "fechado": "bg-success/10 text-success",
+      "perdido": "bg-destructive/10 text-destructive",
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
@@ -181,9 +212,9 @@ export default function Leads() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {brokerOptions.map((broker) => (
-                    <SelectItem key={broker} value={broker}>
-                      {broker}
+                  {brokerOptions.map((brokerId) => (
+                    <SelectItem key={brokerId} value={brokerId}>
+                      {brokerId === "Todos" ? "Todos" : brokerMap[brokerId] || brokerId}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -207,7 +238,13 @@ export default function Leads() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredLeads.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                </TableCell>
+              </TableRow>
+            ) : filteredLeads.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Nenhum lead encontrado com os filtros aplicados.
@@ -223,19 +260,19 @@ export default function Leads() {
                   <TableCell className="font-medium">{lead.name}</TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="text-sm">{lead.email}</div>
+                      <div className="text-sm">{lead.email || '-'}</div>
                       <div className="text-xs text-muted-foreground">{lead.phone}</div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusColor(lead.status)}>
-                      {lead.status}
+                      {statusLabels[lead.status] || lead.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm">{lead.origin}</TableCell>
-                  <TableCell className="text-sm">{lead.broker}</TableCell>
+                  <TableCell className="text-sm">{originLabels[lead.origin] || lead.origin}</TableCell>
+                  <TableCell className="text-sm">{lead.assigned_broker_id ? brokerMap[lead.assigned_broker_id] || '-' : '-'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(lead.date).toLocaleDateString('pt-BR')}
+                    {new Date(lead.created_at).toLocaleDateString('pt-BR')}
                   </TableCell>
                 </TableRow>
               ))

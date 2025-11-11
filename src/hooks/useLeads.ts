@@ -1,0 +1,92 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+import type { Database } from "@/integrations/supabase/types";
+
+type DbLead = Database['public']['Tables']['leads']['Row'];
+type DbLeadInsert = Database['public']['Tables']['leads']['Insert'];
+type DbLeadUpdate = Database['public']['Tables']['leads']['Update'];
+
+export interface Lead extends DbLead {}
+
+export const useLeads = () => {
+  return useQuery({
+    queryKey: ["leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Lead[];
+    },
+  });
+};
+
+export const useLead = (id: string) => {
+  return useQuery({
+    queryKey: ["lead", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      return data as Lead;
+    },
+    enabled: !!id,
+  });
+};
+
+export const useCreateLead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (lead: DbLeadInsert) => {
+      const { data, error } = await supabase
+        .from("leads")
+        .insert([lead])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success("Lead criado com sucesso!");
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao criar lead: " + error.message);
+    },
+  });
+};
+
+export const useUpdateLead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string } & DbLeadUpdate) => {
+      const { data, error } = await supabase
+        .from("leads")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success("Lead atualizado com sucesso!");
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar lead: " + error.message);
+    },
+  });
+};
