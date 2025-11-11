@@ -9,6 +9,10 @@ import Leads from "./pages/Leads";
 import LeadProfile from "./pages/LeadProfile";
 import Kanban from "./pages/Kanban";
 import Properties from "./pages/Properties";
+import Brokers from "./pages/Brokers";
+import Owners from "./pages/Owners";
+import Calendar from "./pages/Calendar";
+import Reports from "./pages/Reports";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -63,13 +67,18 @@ const App = () => (
             }
           />
           <Route
+            path="/brokers"
+            element={
+              <DashboardLayout>
+                <Brokers />
+              </DashboardLayout>
+            }
+          />
+          <Route
             path="/owners"
             element={
               <DashboardLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold">Proprietários</h2>
-                  <p className="text-muted-foreground mt-2">Em desenvolvimento</p>
-                </div>
+                <Owners />
               </DashboardLayout>
             }
           />
@@ -77,10 +86,7 @@ const App = () => (
             path="/calendar"
             element={
               <DashboardLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold">Agenda</h2>
-                  <p className="text-muted-foreground mt-2">Em desenvolvimento</p>
-                </div>
+                <Calendar />
               </DashboardLayout>
             }
           />
@@ -88,10 +94,7 @@ const App = () => (
             path="/reports"
             element={
               <DashboardLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold">Relatórios</h2>
-                  <p className="text-muted-foreground mt-2">Em desenvolvimento</p>
-                </div>
+                <Reports />
               </DashboardLayout>
             }
           />
