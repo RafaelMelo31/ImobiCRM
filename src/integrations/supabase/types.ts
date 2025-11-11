@@ -14,16 +14,403 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      brokers: {
+        Row: {
+          commission_rate: number | null
+          created_at: string
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          status: Database["public"]["Enums"]["broker_status"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          commission_rate?: number | null
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["broker_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          commission_rate?: number | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["broker_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brokers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          broker_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_time: string
+          id: string
+          lead_id: string | null
+          property_id: string | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          broker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_time: string
+          id?: string
+          lead_id?: string | null
+          property_id?: string | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          broker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_time?: string
+          id?: string
+          lead_id?: string | null
+          property_id?: string | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "brokers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_properties: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          property_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          property_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_properties_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_properties_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          assigned_broker_id: string | null
+          budget: number | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          origin: Database["public"]["Enums"]["lead_origin"]
+          phone: string
+          status: Database["public"]["Enums"]["lead_status"]
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_broker_id?: string | null
+          budget?: number | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          origin?: Database["public"]["Enums"]["lead_origin"]
+          phone: string
+          status?: Database["public"]["Enums"]["lead_status"]
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_broker_id?: string | null
+          budget?: number | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          origin?: Database["public"]["Enums"]["lead_origin"]
+          phone?: string
+          status?: Database["public"]["Enums"]["lead_status"]
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_assigned_broker_id_fkey"
+            columns: ["assigned_broker_id"]
+            isOneToOne: false
+            referencedRelation: "brokers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owners: {
+        Row: {
+          address: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string
+          status: Database["public"]["Enums"]["owner_status"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone: string
+          status?: Database["public"]["Enums"]["owner_status"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string
+          status?: Database["public"]["Enums"]["owner_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string
+          area: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string
+          created_at: string
+          description: string | null
+          id: string
+          owner_id: string | null
+          photos: string[] | null
+          price: number | null
+          property_type: Database["public"]["Enums"]["property_type"]
+          state: string
+          status: Database["public"]["Enums"]["property_status"]
+          title: string
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          address: string
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          owner_id?: string | null
+          photos?: string[] | null
+          price?: number | null
+          property_type: Database["public"]["Enums"]["property_type"]
+          state: string
+          status?: Database["public"]["Enums"]["property_status"]
+          title: string
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          owner_id?: string | null
+          photos?: string[] | null
+          price?: number | null
+          property_type?: Database["public"]["Enums"]["property_type"]
+          state?: string
+          status?: Database["public"]["Enums"]["property_status"]
+          title?: string
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "broker" | "manager"
+      broker_status: "ativo" | "inativo" | "ferias"
+      lead_origin:
+        | "website"
+        | "indicacao"
+        | "redes_sociais"
+        | "telefone"
+        | "email"
+        | "evento"
+        | "outro"
+      lead_status:
+        | "novo"
+        | "contato"
+        | "qualificado"
+        | "proposta"
+        | "negociacao"
+        | "fechado"
+        | "perdido"
+      owner_status: "ativo" | "inativo"
+      property_status: "disponivel" | "reservado" | "vendido" | "alugado"
+      property_type:
+        | "apartamento"
+        | "casa"
+        | "terreno"
+        | "comercial"
+        | "rural"
+        | "outro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +537,37 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "broker", "manager"],
+      broker_status: ["ativo", "inativo", "ferias"],
+      lead_origin: [
+        "website",
+        "indicacao",
+        "redes_sociais",
+        "telefone",
+        "email",
+        "evento",
+        "outro",
+      ],
+      lead_status: [
+        "novo",
+        "contato",
+        "qualificado",
+        "proposta",
+        "negociacao",
+        "fechado",
+        "perdido",
+      ],
+      owner_status: ["ativo", "inativo"],
+      property_status: ["disponivel", "reservado", "vendido", "alugado"],
+      property_type: [
+        "apartamento",
+        "casa",
+        "terreno",
+        "comercial",
+        "rural",
+        "outro",
+      ],
+    },
   },
 } as const
