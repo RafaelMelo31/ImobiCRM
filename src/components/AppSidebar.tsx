@@ -1,4 +1,4 @@
-import { Home, Users, Building2, UserCircle, Calendar, BarChart3, Layers } from "lucide-react";
+import { Home, Users, Building2, UserCircle, Calendar, BarChart3, Layers, Briefcase } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -19,6 +19,7 @@ const menuItems = [
   { title: "Funil", url: "/kanban", icon: Layers },
   { title: "Imóveis", url: "/properties", icon: Building2 },
   { title: "Proprietários", url: "/owners", icon: UserCircle },
+  { title: "Corretores", url: "/brokers", icon: Briefcase },
   { title: "Agenda", url: "/calendar", icon: Calendar },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
 ];
