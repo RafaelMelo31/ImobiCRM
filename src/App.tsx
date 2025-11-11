@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardLayout } from "./components/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
+import LeadProfile from "./pages/LeadProfile";
 import Kanban from "./pages/Kanban";
 import Properties from "./pages/Properties";
 import Login from "./pages/Login";
@@ -34,6 +35,14 @@ const App = () => (
             element={
               <DashboardLayout>
                 <Leads />
+              </DashboardLayout>
+            }
+          />
+          <Route
+            path="/leads/:id"
+            element={
+              <DashboardLayout>
+                <LeadProfile />
               </DashboardLayout>
             }
           />
