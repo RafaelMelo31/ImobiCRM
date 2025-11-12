@@ -16,11 +16,58 @@ export const useLeads = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leads")
-        .select("*")
+        .select(`
+          *,
+          brokers:assigned_broker_id (
+            id,
+            name,
+            email
+          )
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Lead[];
+    },
+  });
+};
+
+export const useLeadsWithEvents = () => {
+  return useQuery({
+    queryKey: ["leads-with-events"],
+    queryFn: async () => {
+      const { data: leads, error: leadsError } = await supabase
+        .from("leads")
+        .select(`
+          *,
+          brokers:assigned_broker_id (
+            id,
+            name,
+            email
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (leadsError) throw leadsError;
+
+      const { data: events, error: eventsError } = await supabase
+        .from("events")
+        .select("*")
+        .order("start_time", { ascending: true });
+
+      if (eventsError) throw eventsError;
+
+      // Combinar leads com eventos
+      const leadsWithEvents = leads?.map((lead) => {
+        const leadEvents = events?.filter((event) => event.lead_id === lead.id) || [];
+        return {
+          ...lead,
+          events: leadEvents,
+          eventsCount: leadEvents.length,
+        };
+      });
+
+      return leadsWithEvents || [];
     },
   });
 };

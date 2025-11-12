@@ -82,9 +82,7 @@ export default function LeadProfile() {
     try {
       await updateLead.mutateAsync({
         id,
-        updates: {
-          notes: lead?.notes ? `${lead.notes}\n\n${new Date().toLocaleString('pt-BR')}: ${newNote}` : `${new Date().toLocaleString('pt-BR')}: ${newNote}`,
-        },
+        notes: lead?.notes ? `${lead.notes}\n\n${new Date().toLocaleString('pt-BR')}: ${newNote}` : `${new Date().toLocaleString('pt-BR')}: ${newNote}`,
       });
       toast.success("Nota adicionada com sucesso!");
       setNewNote("");
@@ -146,16 +144,14 @@ export default function LeadProfile() {
 
       await updateLead.mutateAsync({
         id,
-        updates: {
-          name: name.trim(),
-          email: email.trim() || null,
-          phone: phone.trim(),
-          status: getLeadStatusFromLabel(status) as any,
-          origin: getLeadOriginFromLabel(origin) as any,
-          assigned_broker_id: brokerId && brokerId !== "none" ? brokerId : null,
-          budget: budgetValue && !isNaN(budgetValue) ? budgetValue : null,
-          tags: tagsArray && tagsArray.length > 0 ? tagsArray : null,
-        },
+        name: name.trim(),
+        email: email.trim() || null,
+        phone: phone.trim(),
+        status: getLeadStatusFromLabel(status) as any,
+        origin: getLeadOriginFromLabel(origin) as any,
+        assigned_broker_id: brokerId && brokerId !== "none" ? brokerId : null,
+        budget: budgetValue && !isNaN(budgetValue) ? budgetValue : null,
+        tags: tagsArray && tagsArray.length > 0 ? tagsArray : null,
       });
 
       toast.success("Lead atualizado com sucesso!");
