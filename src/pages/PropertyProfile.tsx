@@ -86,6 +86,74 @@ export default function PropertyProfile() {
     }
   }, [property]);
 
+  const formatPriceInput = (value: string) => {
+    // Remove tudo exceto dígitos, vírgula e ponto
+    // Permite múltiplas vírgulas e pontos para flexibilidade
+    return value.replace(/[^\d,.]/g, "");
+  };
+
+  const parsePriceValue = (priceStr: string): number | null => {
+    if (!priceStr.trim()) return null;
+    
+    // Remove espaços e caracteres não numéricos exceto vírgula e ponto
+    let cleaned = priceStr.trim().replace(/[^\d,.]/g, "");
+    
+    // Encontra a última vírgula e o último ponto
+    const lastCommaIndex = cleaned.lastIndexOf(",");
+    const lastDotIndex = cleaned.lastIndexOf(".");
+    
+    if (lastCommaIndex !== -1 && lastDotIndex !== -1) {
+      // Tem ambos vírgula e ponto
+      // Determina qual é o separador decimal (o que vem por último geralmente)
+      if (lastCommaIndex > lastDotIndex) {
+        // Vírgula vem por último: formato BR (ex: 1.234,56 ou 900.000,00)
+        // Remove todos os pontos (separadores de milhares) e substitui vírgula por ponto
+        const beforeComma = cleaned.substring(0, lastCommaIndex);
+        const afterComma = cleaned.substring(lastCommaIndex + 1);
+        
+        // Detecta padrão como "900.00,00" (3 dígitos, ponto, dois zeros, vírgula, dois zeros)
+        // Nesse caso, o usuário provavelmente quer 900.000,00 (adiciona zeros)
+        const patternMatch = beforeComma.match(/^(\d{1,3})\.00$/);
+        let digitsBeforeComma = beforeComma.replace(/\./g, "");
+        
+        if (patternMatch) {
+          // Padrão "900.00" -> interpreta como "900000" (adiciona zeros)
+          const baseDigits = patternMatch[1]; // "900"
+          digitsBeforeComma = baseDigits + "000"; // "900000"
+        }
+        
+        cleaned = digitsBeforeComma + "." + afterComma;
+      } else {
+        // Ponto vem por último: formato US (ex: 1,234.56)
+        // Remove todas as vírgulas (separadores de milhares)
+        cleaned = cleaned.replace(/,/g, "");
+      }
+    } else if (lastCommaIndex !== -1) {
+      // Só tem vírgula
+      const afterComma = cleaned.substring(lastCommaIndex + 1);
+      if (afterComma.length <= 2) {
+        // 2 ou menos dígitos após vírgula = formato BR (decimal)
+        cleaned = cleaned.replace(",", ".");
+      } else {
+        // Mais de 2 dígitos = provavelmente separador de milhares, remove
+        cleaned = cleaned.replace(/,/g, "");
+      }
+    } else if (lastDotIndex !== -1) {
+      // Só tem ponto
+      const afterDot = cleaned.substring(lastDotIndex + 1);
+      if (afterDot.length <= 2) {
+        // 2 ou menos dígitos após ponto = formato US (decimal), mantém
+        // Não precisa fazer nada
+      } else {
+        // Mais de 2 dígitos = provavelmente separador de milhares, remove
+        cleaned = cleaned.replace(/\./g, "");
+      }
+    }
+    
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) || parsed <= 0 ? null : parsed;
+  };
+
   // Função de salvamento do formulário completo
   const handleUpdateProperty = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -96,11 +164,9 @@ export default function PropertyProfile() {
     }
 
     try {
-      const priceValue = price.trim() 
-        ? parseFloat(price.trim().replace(/[^\d,.-]/g, "").replace(",", "."))
-        : null;
+      const priceValue = parsePriceValue(price);
       
-      if (price.trim() && (isNaN(priceValue!) || priceValue! <= 0)) {
+      if (price.trim() && priceValue === null) {
         toast.error("Preço deve ser um valor numérico válido");
         return;
       }
@@ -112,7 +178,7 @@ export default function PropertyProfile() {
           description: description.trim() || null,
           property_type: propertyType as any,
           status: status as any,
-          price: priceValue && !isNaN(priceValue) ? priceValue : null,
+          price: priceValue,
           address: address.trim(),
           city: city.trim(),
           state: state.trim().toUpperCase(),
@@ -476,9 +542,9 @@ export default function PropertyProfile() {
                   <Label htmlFor="price">Preço</Label>
                   <Input
                     id="price"
-                    placeholder="Ex: 350.000,00"
+                    placeholder="Ex: 350.000,00 ou 350000,00 ou 350000.50"
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => setPrice(formatPriceInput(e.target.value))}
                   />
                 </div>
               </div>

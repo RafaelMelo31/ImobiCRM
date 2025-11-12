@@ -308,7 +308,7 @@ export default function OwnerProfile() {
                   <div
                     key={property.id}
                     className="p-4 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/properties?propertyId=${property.id}`)}
+                    onClick={() => navigate(`/properties/${property.id}`)}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">

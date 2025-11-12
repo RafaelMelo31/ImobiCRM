@@ -28,11 +28,26 @@ import {
   X,
   Loader2
 } from "lucide-react";
-import { useLeads } from "@/hooks/useLeads";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useLeads, useCreateLead } from "@/hooks/useLeads";
 import { useBrokers } from "@/hooks/useBrokers";
+import { getLeadStatusFromLabel, getLeadOriginFromLabel } from "@/lib/mappers";
+import { toast } from "sonner";
 
 const statusOptions = ["Todos", "novo", "contatado", "qualificado", "visita_agendada", "proposta_enviada", "negociacao", "fechado", "perdido"];
 const originOptions = ["Todas", "site", "indicacao", "facebook", "instagram", "google", "whatsapp", "outro"];
+
+// Opções para o formulário de adicionar lead
+const statusOptionsForm = ["Novo Lead", "Em Atendimento", "Qualificado", "Visita Agendada", "Em Negociação", "Venda", "Perdido"];
+const originOptionsForm = ["Site", "Indicação", "Facebook Ads", "Instagram", "Google Ads", "WhatsApp", "E-mail", "Evento", "Outro"];
 const statusLabels: Record<string, string> = {
   "novo": "Novo Lead",
   "contatado": "Contatado",
@@ -59,9 +74,22 @@ export default function Leads() {
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [originFilter, setOriginFilter] = useState("Todas");
   const [brokerFilter, setBrokerFilter] = useState("Todos");
+  
+  // Estados do Dialog de adicionar lead
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [status, setStatus] = useState("Novo Lead");
+  const [origin, setOrigin] = useState("Site");
+  const [brokerId, setBrokerId] = useState("");
+  const [budget, setBudget] = useState("");
+  const [tags, setTags] = useState("");
+  const [notes, setNotes] = useState("");
 
   const { data: leads, isLoading } = useLeads();
   const { data: brokers } = useBrokers();
+  const createLead = useCreateLead();
 
   const brokerMap = useMemo(() => {
     if (!brokers) return {};
@@ -116,6 +144,58 @@ export default function Leads() {
     return colors[status] || "bg-muted text-muted-foreground";
   };
 
+  const handleAddLead = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    if (!name.trim() || !phone.trim()) {
+      toast.error("Nome e telefone são obrigatórios");
+      return;
+    }
+
+    try {
+      const budgetValue = budget.trim() 
+        ? parseFloat(budget.trim().replace(/[^\d,.-]/g, "").replace(",", "."))
+        : null;
+      
+      if (budget.trim() && (isNaN(budgetValue!) || budgetValue! <= 0)) {
+        toast.error("Orçamento deve ser um valor numérico válido");
+        return;
+      }
+
+      const tagsArray = tags.trim() 
+        ? tags.split(",").map(t => t.trim()).filter(t => t)
+        : null;
+
+      await createLead.mutateAsync({
+        name: name.trim(),
+        email: email.trim() || null,
+        phone: phone.trim(),
+        status: getLeadStatusFromLabel(status) as any,
+        origin: getLeadOriginFromLabel(origin) as any,
+        assigned_broker_id: brokerId && brokerId !== "none" ? brokerId : null,
+        budget: budgetValue && !isNaN(budgetValue) ? budgetValue : null,
+        tags: tagsArray && tagsArray.length > 0 ? tagsArray : null,
+        notes: notes.trim() || null,
+      });
+
+      toast.success("Lead adicionado com sucesso!");
+      setIsDialogOpen(false);
+      // Limpar formulário
+      setName("");
+      setEmail("");
+      setPhone("");
+      setStatus("Novo Lead");
+      setOrigin("Site");
+      setBrokerId("");
+      setBudget("");
+      setTags("");
+      setNotes("");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao adicionar lead");
+      console.error(error);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -134,10 +214,149 @@ export default function Leads() {
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Lead
-          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar Lead
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Adicionar Novo Lead</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddLead} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome Completo *</Label>
+                    <Input
+                      id="name"
+                      placeholder="Ex: João Silva"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(11) 98765-4321"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="joao@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status *</Label>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptionsForm.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="origin">Origem *</Label>
+                    <Select value={origin} onValueChange={setOrigin}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {originOptionsForm.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="broker">Corretor Responsável</Label>
+                    <Select
+                      value={brokerId || "none"}
+                      onValueChange={(value) => setBrokerId(value === "none" ? "" : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um corretor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Não atribuído</SelectItem>
+                        {brokers?.map((broker) => (
+                          <SelectItem key={broker.id} value={broker.id}>
+                            {broker.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="budget">Orçamento</Label>
+                    <Input
+                      id="budget"
+                      placeholder="Ex: 350.000,00"
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tags">Tags (separadas por vírgula)</Label>
+                  <Input
+                    id="tags"
+                    placeholder="Ex: urgente, apartamento, centro"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Observações</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Informações adicionais..."
+                    rows={3}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={createLead.isPending}
+                >
+                  {createLead.isPending ? "Adicionando..." : "Adicionar Lead"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

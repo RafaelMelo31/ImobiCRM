@@ -81,12 +81,41 @@ export const useUpdateLead = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["lead", variables.id] });
       toast.success("Lead atualizado com sucesso!");
     },
     onError: (error: any) => {
       toast.error("Erro ao atualizar lead: " + error.message);
     },
+  });
+};
+
+export const useLeadProperties = (leadId: string) => {
+  return useQuery({
+    queryKey: ["lead-properties", leadId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lead_properties")
+        .select(`
+          *,
+          properties:property_id (
+            id,
+            title,
+            price,
+            address,
+            city,
+            state,
+            status,
+            property_type
+          )
+        `)
+        .eq("lead_id", leadId);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!leadId,
   });
 };

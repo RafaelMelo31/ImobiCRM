@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Search, Mail, Phone, TrendingUp, Users, Award } from "lucide-react";
 import { toast } from "sonner";
 import { useBrokers, useCreateBroker } from "@/hooks/useBrokers";
+import { useLeads } from "@/hooks/useLeads";
 import { brokerStatusMap } from "@/lib/mappers";
 
 export default function Brokers() {
@@ -33,9 +34,28 @@ export default function Brokers() {
   const [phone, setPhone] = useState("");
 
   const { data: brokers = [], isLoading } = useBrokers();
+  const { data: leads = [] } = useLeads();
   const createBroker = useCreateBroker();
 
-  const filteredBrokers = brokers.filter((broker) =>
+  // Calcular estatísticas para cada corretor
+  const brokersWithStats = brokers.map((broker) => {
+    const brokerLeads = leads.filter((lead) => lead.assigned_broker_id === broker.id);
+    const activeLeads = brokerLeads.filter(
+      (lead) => lead.status !== "fechado" && lead.status !== "perdido"
+    ).length;
+    const closedDeals = brokerLeads.filter((lead) => lead.status === "fechado").length;
+    const conversionRate =
+      brokerLeads.length > 0 ? Math.round((closedDeals / brokerLeads.length) * 100) : 0;
+
+    return {
+      ...broker,
+      activeLeads,
+      closedDeals,
+      conversionRate,
+    };
+  });
+
+  const filteredBrokers = brokersWithStats.filter((broker) =>
     broker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     broker.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -63,11 +83,11 @@ export default function Brokers() {
     }
   };
 
-  const totalActiveLeads = brokers.reduce((sum, b) => sum + (b.activeLeads || 0), 0);
-  const totalClosedDeals = brokers.reduce((sum, b) => sum + (b.closedDeals || 0), 0);
-  const avgConversion = brokers.length > 0
+  const totalActiveLeads = brokersWithStats.reduce((sum, b) => sum + (b.activeLeads || 0), 0);
+  const totalClosedDeals = brokersWithStats.reduce((sum, b) => sum + (b.closedDeals || 0), 0);
+  const avgConversion = brokersWithStats.length > 0
     ? Math.round(
-        brokers.reduce((sum, b) => sum + (b.conversionRate || 0), 0) / brokers.length
+        brokersWithStats.reduce((sum, b) => sum + (b.conversionRate || 0), 0) / brokersWithStats.length
       )
     : 0;
 
