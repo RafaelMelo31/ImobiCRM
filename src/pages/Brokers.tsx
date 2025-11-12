@@ -22,82 +22,64 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Mail, Phone, TrendingUp, Users, Award } from "lucide-react";
 import { toast } from "sonner";
-
-interface Broker {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  activeLeads: number;
-  closedDeals: number;
-  conversionRate: number;
-  status: "active" | "inactive";
-}
-
-const mockBrokers: Broker[] = [
-  {
-    id: "1",
-    name: "Carlos Silva",
-    email: "carlos@imobicrm.com",
-    phone: "(11) 98765-4321",
-    activeLeads: 23,
-    closedDeals: 12,
-    conversionRate: 34,
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Ana Costa",
-    email: "ana@imobicrm.com",
-    phone: "(11) 98765-4322",
-    activeLeads: 18,
-    closedDeals: 15,
-    conversionRate: 45,
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Pedro Martins",
-    email: "pedro@imobicrm.com",
-    phone: "(11) 98765-4323",
-    activeLeads: 31,
-    closedDeals: 8,
-    conversionRate: 28,
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Julia Oliveira",
-    email: "julia@imobicrm.com",
-    phone: "(11) 98765-4324",
-    activeLeads: 15,
-    closedDeals: 10,
-    conversionRate: 40,
-    status: "inactive",
-  },
-];
+import { useBrokers, useCreateBroker } from "@/hooks/useBrokers";
+import { brokerStatusMap } from "@/lib/mappers";
 
 export default function Brokers() {
-  const [brokers, setBrokers] = useState<Broker[]>(mockBrokers);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const { data: brokers = [], isLoading } = useBrokers();
+  const createBroker = useCreateBroker();
 
   const filteredBrokers = brokers.filter((broker) =>
     broker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     broker.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddBroker = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddBroker = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    toast.success("Corretor adicionado com sucesso!");
-    setIsDialogOpen(false);
+    
+    try {
+      await createBroker.mutateAsync({
+        name,
+        email,
+        phone: phone || null,
+        status: "ativo" as const,
+        commission_rate: null,
+        user_id: null,
+      });
+      toast.success("Corretor adicionado com sucesso!");
+      setIsDialogOpen(false);
+      setName("");
+      setEmail("");
+      setPhone("");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao adicionar corretor");
+      console.error(error);
+    }
   };
 
-  const totalActiveLeads = brokers.reduce((sum, b) => sum + b.activeLeads, 0);
-  const totalClosedDeals = brokers.reduce((sum, b) => sum + b.closedDeals, 0);
-  const avgConversion = Math.round(
-    brokers.reduce((sum, b) => sum + b.conversionRate, 0) / brokers.length
-  );
+  const totalActiveLeads = brokers.reduce((sum, b) => sum + (b.activeLeads || 0), 0);
+  const totalClosedDeals = brokers.reduce((sum, b) => sum + (b.closedDeals || 0), 0);
+  const avgConversion = brokers.length > 0
+    ? Math.round(
+        brokers.reduce((sum, b) => sum + (b.conversionRate || 0), 0) / brokers.length
+      )
+    : 0;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Carregando corretores...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -123,7 +105,13 @@ export default function Brokers() {
             <form onSubmit={handleAddBroker} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Nome Completo</Label>
-                <Input id="name" placeholder="Ex: João Silva" required />
+                <Input 
+                  id="name" 
+                  placeholder="Ex: João Silva" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -131,6 +119,8 @@ export default function Brokers() {
                   id="email"
                   type="email"
                   placeholder="joao@imobicrm.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -140,11 +130,16 @@ export default function Brokers() {
                   id="phone"
                   type="tel"
                   placeholder="(11) 98765-4321"
-                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Adicionar Corretor
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={createBroker.isPending}
+              >
+                {createBroker.isPending ? "Adicionando..." : "Adicionar Corretor"}
               </Button>
             </form>
           </DialogContent>
@@ -233,34 +228,36 @@ export default function Brokers() {
                         <Mail className="h-3 w-3 text-muted-foreground" />
                         <span className="text-muted-foreground">{broker.email}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">{broker.phone}</span>
-                      </div>
+                      {broker.phone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{broker.phone}</span>
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="font-semibold">{broker.activeLeads}</span>
+                    <span className="font-semibold">{broker.activeLeads || 0}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="font-semibold text-success">{broker.closedDeals}</span>
+                    <span className="font-semibold text-success">{broker.closedDeals || 0}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary"
-                          style={{ width: `${broker.conversionRate}%` }}
+                          style={{ width: `${Math.min(broker.conversionRate || 0, 100)}%` }}
                         />
                       </div>
-                      <span className="text-sm font-medium">{broker.conversionRate}%</span>
+                      <span className="text-sm font-medium">{broker.conversionRate || 0}%</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={broker.status === "active" ? "default" : "secondary"}
+                      variant={broker.status === "ativo" ? "default" : "secondary"}
                     >
-                      {broker.status === "active" ? "Ativo" : "Inativo"}
+                      {brokerStatusMap[broker.status] || broker.status}
                     </Badge>
                   </TableCell>
                 </TableRow>

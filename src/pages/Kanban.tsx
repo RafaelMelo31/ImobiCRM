@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Mail, Calendar } from "lucide-react";
@@ -15,9 +15,12 @@ import {
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useLeads, useUpdateLead } from "@/hooks/useLeads";
+import { leadStatusMap } from "@/lib/mappers";
+import { useNavigate } from "react-router-dom";
 
 interface LeadCard {
-  id: number;
+  id: string;
   name: string;
   property: string;
   tags: string[];
@@ -26,42 +29,19 @@ interface LeadCard {
 interface Column {
   id: string;
   title: string;
+  status: string;
   cards: LeadCard[];
 }
 
-const initialColumns: Column[] = [
-  {
-    id: "novo-lead",
-    title: "Novo Lead",
-    cards: [
-      { id: 1, name: "Ana Paula", property: "Apto 2qts Centro", tags: ["Urgente"] },
-    ],
-  },
-  {
-    id: "em-atendimento",
-    title: "Em Atendimento",
-    cards: [
-      { id: 2, name: "Carlos Lima", property: "Casa 3qts Jardim", tags: [] },
-      { id: 3, name: "Fernanda Dias", property: "Apto 1qt Praia", tags: ["VIP"] },
-    ],
-  },
-  {
-    id: "visita-agendada",
-    title: "Visita Agendada",
-    cards: [
-      { id: 4, name: "Roberto Alves", property: "Casa 4qts Cond.", tags: [] },
-    ],
-  },
-  {
-    id: "em-negociacao",
-    title: "Em Negociação",
-    cards: [
-      { id: 5, name: "Julia Santos", property: "Cobertura Luxo", tags: ["VIP"] },
-    ],
-  },
+const columnsConfig: Column[] = [
+  { id: "novo-lead", title: "Novo Lead", status: "novo", cards: [] },
+  { id: "em-atendimento", title: "Em Atendimento", status: "contato", cards: [] },
+  { id: "visita-agendada", title: "Visita Agendada", status: "proposta", cards: [] },
+  { id: "em-negociacao", title: "Em Negociação", status: "negociacao", cards: [] },
 ];
 
 function SortableCard({ card }: { card: LeadCard }) {
+  const navigate = useNavigate();
   const {
     attributes,
     listeners,
@@ -84,20 +64,23 @@ function SortableCard({ card }: { card: LeadCard }) {
       {...attributes}
       {...listeners}
       className="cursor-move hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 border-border/50"
+      onClick={() => navigate(`/leads/${card.id}`)}
     >
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium">{card.name}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">{card.property}</p>
+        {card.property && (
+          <p className="text-xs text-muted-foreground">{card.property}</p>
+        )}
 
-        {card.tags.length > 0 && (
-          <div className="flex gap-1">
+        {card.tags && card.tags.length > 0 && (
+          <div className="flex gap-1 flex-wrap">
             {card.tags.map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
-                className="text-xs bg-destructive/10 text-destructive"
+                className="text-xs bg-primary/10 text-primary"
               >
                 {tag}
               </Badge>
@@ -106,13 +89,29 @@ function SortableCard({ card }: { card: LeadCard }) {
         )}
 
         <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-          <button className="p-1 hover:bg-muted rounded transition-colors duration-200">
+          <button 
+            className="p-1 hover:bg-muted rounded transition-colors duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(`tel:${card.id}`);
+            }}
+          >
             <Phone className="h-3 w-3 text-muted-foreground" />
           </button>
-          <button className="p-1 hover:bg-muted rounded transition-colors duration-200">
+          <button 
+            className="p-1 hover:bg-muted rounded transition-colors duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
             <Mail className="h-3 w-3 text-muted-foreground" />
           </button>
-          <button className="p-1 hover:bg-muted rounded transition-colors duration-200">
+          <button 
+            className="p-1 hover:bg-muted rounded transition-colors duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
             <Calendar className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
@@ -122,7 +121,8 @@ function SortableCard({ card }: { card: LeadCard }) {
 }
 
 export default function Kanban() {
-  const [columns, setColumns] = useState<Column[]>(initialColumns);
+  const { data: leads = [], isLoading } = useLeads();
+  const updateLead = useUpdateLead();
   const [activeCard, setActiveCard] = useState<LeadCard | null>(null);
 
   const sensors = useSensors(
@@ -133,6 +133,22 @@ export default function Kanban() {
     })
   );
 
+  // Organizar leads por status
+  const columns = useMemo(() => {
+    const cols = columnsConfig.map((col) => ({
+      ...col,
+      cards: leads
+        .filter((lead) => lead.status === col.status)
+        .map((lead) => ({
+          id: lead.id,
+          name: lead.name,
+          property: lead.budget ? `Orçamento: R$ ${lead.budget.toLocaleString("pt-BR")}` : "Sem orçamento",
+          tags: lead.tags || [],
+        })),
+    }));
+    return cols;
+  }, [leads]);
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const activeColumn = columns.find((col) =>
@@ -142,7 +158,7 @@ export default function Kanban() {
     setActiveCard(card || null);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over) {
@@ -150,57 +166,67 @@ export default function Kanban() {
       return;
     }
 
-    const activeCardId = active.id;
-    const overCardId = over.id;
+    const activeCardId = active.id as string;
+    let overColumnId = over.id as string;
 
-    // Find source and destination columns
+    // Se o over.id não for uma coluna, procurar em qual coluna o card foi solto
+    let destColumn = columns.find((col) => col.id === overColumnId);
+    
+    // Se não encontrou, pode ser que foi solto em um card, então procurar a coluna que contém esse card
+    if (!destColumn) {
+      destColumn = columns.find((col) => 
+        col.cards.some((card) => card.id === overColumnId)
+      );
+    }
+
+    // Se ainda não encontrou, procurar pela coluna que contém o card ativo (source)
+    if (!destColumn) {
+      const sourceColumn = columns.find((col) =>
+        col.cards.some((card) => card.id === activeCardId)
+      );
+      // Se não encontrou coluna de destino, usar a de origem (não mudou)
+      if (!sourceColumn) {
+        setActiveCard(null);
+        return;
+      }
+      setActiveCard(null);
+      return;
+    }
+
+    // Verificar se o status realmente mudou
     const sourceColumn = columns.find((col) =>
       col.cards.some((card) => card.id === activeCardId)
     );
-    const destColumn = columns.find(
-      (col) =>
-        col.id === overCardId || col.cards.some((card) => card.id === overCardId)
-    );
 
-    if (!sourceColumn || !destColumn) {
+    if (sourceColumn && sourceColumn.status === destColumn.status) {
       setActiveCard(null);
       return;
     }
 
-    const newColumns = columns.map((col) => ({ ...col, cards: [...col.cards] }));
-
-    const sourceColIndex = newColumns.findIndex((col) => col.id === sourceColumn.id);
-    const destColIndex = newColumns.findIndex((col) => col.id === destColumn.id);
-
-    const cardToMove = newColumns[sourceColIndex].cards.find(
-      (card) => card.id === activeCardId
-    );
-
-    if (!cardToMove) {
-      setActiveCard(null);
-      return;
+    // Atualizar status do lead no banco
+    try {
+      await updateLead.mutateAsync({
+        id: activeCardId,
+        updates: {
+          status: destColumn.status as any,
+        },
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar status do lead:", error);
     }
 
-    // Remove card from source
-    newColumns[sourceColIndex].cards = newColumns[sourceColIndex].cards.filter(
-      (card) => card.id !== activeCardId
-    );
-
-    // Add to destination
-    if (destColumn.id === overCardId) {
-      // Dropped on column itself (drop zone)
-      newColumns[destColIndex].cards.push(cardToMove);
-    } else {
-      // Dropped on another card
-      const overCardIndex = newColumns[destColIndex].cards.findIndex(
-        (card) => card.id === overCardId
-      );
-      newColumns[destColIndex].cards.splice(overCardIndex, 0, cardToMove);
-    }
-
-    setColumns(newColumns);
     setActiveCard(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Carregando leads...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -227,25 +253,27 @@ export default function Kanban() {
                 </Badge>
               </div>
 
-              <SortableContext
-                items={column.cards.map((card) => card.id)}
-                strategy={verticalListSortingStrategy}
+              <div 
+                id={column.id}
+                className="space-y-3 min-h-[200px]"
               >
-                <div className="space-y-3 min-h-[200px]">
+                <SortableContext
+                  items={column.cards.map((card) => card.id)}
+                  strategy={verticalListSortingStrategy}
+                >
                   {column.cards.map((card) => (
                     <SortableCard key={card.id} card={card} />
                   ))}
+                </SortableContext>
 
-                  <Card
-                    id={column.id}
-                    className="border-dashed border-2 border-muted-foreground/20 bg-transparent hover:border-muted-foreground/40 transition-colors duration-200"
-                  >
+                {column.cards.length === 0 && (
+                  <Card className="border-dashed border-2 border-muted-foreground/20 bg-transparent min-h-[100px] flex items-center justify-center">
                     <CardContent className="p-4 text-center text-sm text-muted-foreground">
                       Solte aqui
                     </CardContent>
                   </Card>
-                </div>
-              </SortableContext>
+                )}
+              </div>
             </div>
           ))}
         </div>

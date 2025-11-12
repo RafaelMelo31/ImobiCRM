@@ -23,48 +23,108 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Download, TrendingUp, Users, Target, DollarSign } from "lucide-react";
-import { useState } from "react";
-
-const salesFunnelData = [
-  { name: "Novo Lead", value: 45, conversion: 100 },
-  { name: "Contato Inicial", value: 38, conversion: 84 },
-  { name: "Qualificado", value: 28, conversion: 62 },
-  { name: "Visita Agendada", value: 22, conversion: 49 },
-  { name: "Proposta", value: 15, conversion: 33 },
-  { name: "Negociação", value: 10, conversion: 22 },
-  { name: "Fechado", value: 8, conversion: 18 },
-];
-
-const monthlyPerformanceData = [
-  { month: "Jul", leads: 42, deals: 8, revenue: 850000 },
-  { month: "Ago", leads: 38, deals: 6, revenue: 720000 },
-  { month: "Set", leads: 51, deals: 10, revenue: 1100000 },
-  { month: "Out", leads: 48, deals: 9, revenue: 950000 },
-  { month: "Nov", leads: 55, deals: 12, revenue: 1250000 },
-  { month: "Dez", leads: 62, deals: 15, revenue: 1580000 },
-];
-
-const sourceData = [
-  { name: "Site", value: 35, color: "hsl(var(--primary))" },
-  { name: "Indicação", value: 28, color: "hsl(var(--accent))" },
-  { name: "Redes Sociais", value: 22, color: "hsl(var(--success))" },
-  { name: "Portais", value: 15, color: "hsl(var(--warning))" },
-];
-
-const brokerRankingData = [
-  { name: "Ana Costa", deals: 15, revenue: 1850000 },
-  { name: "Carlos Silva", deals: 12, revenue: 1520000 },
-  { name: "Pedro Martins", deals: 10, revenue: 1280000 },
-  { name: "Julia Oliveira", deals: 8, revenue: 950000 },
-];
+import { useState, useMemo } from "react";
+import { useLeads } from "@/hooks/useLeads";
+import { useBrokers } from "@/hooks/useBrokers";
+import { useProperties } from "@/hooks/useProperties";
+import { leadStatusMap, leadOriginMap, formatCurrency } from "@/lib/mappers";
 
 export default function Reports() {
   const [period, setPeriod] = useState("monthly");
+  const { data: leads = [] } = useLeads();
+  const { data: brokers = [] } = useBrokers();
+  const { data: properties = [] } = useProperties();
 
-  const totalRevenue = monthlyPerformanceData.reduce((sum, d) => sum + d.revenue, 0);
-  const totalDeals = monthlyPerformanceData.reduce((sum, d) => sum + d.deals, 0);
-  const totalLeads = monthlyPerformanceData.reduce((sum, d) => sum + d.leads, 0);
-  const conversionRate = Math.round((totalDeals / totalLeads) * 100);
+  // Calcular dados do funil de vendas
+  const salesFunnelData = useMemo(() => {
+    const statusCounts: Record<string, number> = {
+      novo: 0,
+      contato: 0,
+      qualificado: 0,
+      proposta: 0,
+      negociacao: 0,
+      fechado: 0,
+      perdido: 0,
+    };
+
+    leads.forEach((lead) => {
+      statusCounts[lead.status] = (statusCounts[lead.status] || 0) + 1;
+    });
+
+    const total = leads.length;
+    return [
+      { name: "Novo Lead", value: statusCounts.novo, conversion: total > 0 ? Math.round((statusCounts.novo / total) * 100) : 0 },
+      { name: "Contato", value: statusCounts.contato, conversion: total > 0 ? Math.round((statusCounts.contato / total) * 100) : 0 },
+      { name: "Qualificado", value: statusCounts.qualificado, conversion: total > 0 ? Math.round((statusCounts.qualificado / total) * 100) : 0 },
+      { name: "Proposta", value: statusCounts.proposta, conversion: total > 0 ? Math.round((statusCounts.proposta / total) * 100) : 0 },
+      { name: "Negociação", value: statusCounts.negociacao, conversion: total > 0 ? Math.round((statusCounts.negociacao / total) * 100) : 0 },
+      { name: "Fechado", value: statusCounts.fechado, conversion: total > 0 ? Math.round((statusCounts.fechado / total) * 100) : 0 },
+    ];
+  }, [leads]);
+
+  // Calcular dados de origem
+  const sourceData = useMemo(() => {
+    const originCounts: Record<string, number> = {};
+    
+    leads.forEach((lead) => {
+      const originLabel = leadOriginMap[lead.origin] || lead.origin;
+      originCounts[originLabel] = (originCounts[originLabel] || 0) + 1;
+    });
+
+    const colors = [
+      "hsl(var(--primary))",
+      "hsl(var(--accent))",
+      "hsl(var(--success))",
+      "hsl(var(--warning))",
+      "hsl(var(--destructive))",
+    ];
+
+    return Object.entries(originCounts).map(([name, value], index) => ({
+      name,
+      value,
+      color: colors[index % colors.length],
+    }));
+  }, [leads]);
+
+  // Ranking de brokers
+  const brokerRankingData = useMemo(() => {
+    return brokers
+      .map((broker) => ({
+        name: broker.name,
+        deals: broker.closedDeals || 0,
+        revenue: 0, // Calcular receita baseada em propriedades vendidas se necessário
+      }))
+      .sort((a, b) => b.deals - a.deals)
+      .slice(0, 5);
+  }, [brokers]);
+
+  // Calcular métricas gerais
+  const totalLeads = leads.length;
+  const totalDeals = leads.filter((l) => l.status === "fechado").length;
+  const totalRevenue = properties
+    .filter((p) => p.status === "vendido" && p.price)
+    .reduce((sum, p) => sum + (p.price || 0), 0);
+  const conversionRate = totalLeads > 0 ? Math.round((totalDeals / totalLeads) * 100) : 0;
+
+  // Dados mensais simplificados (poderia ser expandido para agrupar por mês)
+  const monthlyPerformanceData = useMemo(() => {
+    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const currentMonth = new Date().getMonth();
+    
+    return months.slice(Math.max(0, currentMonth - 5), currentMonth + 1).map((month, index) => {
+      // Simulação - em produção, agrupar por mês de criação
+      const monthLeads = Math.floor(leads.length / 6);
+      const monthDeals = Math.floor(totalDeals / 6);
+      const monthRevenue = Math.floor(totalRevenue / 6);
+      
+      return {
+        month,
+        leads: monthLeads,
+        deals: monthDeals,
+        revenue: monthRevenue,
+      };
+    });
+  }, [leads, totalDeals, totalRevenue]);
 
   return (
     <div className="space-y-6">
@@ -104,7 +164,9 @@ export default function Reports() {
             <div>
               <p className="text-sm text-muted-foreground">Receita Total</p>
               <p className="text-2xl font-bold">
-                R$ {(totalRevenue / 1000000).toFixed(1)}M
+                {totalRevenue > 1000000 
+                  ? `R$ ${(totalRevenue / 1000000).toFixed(1)}M`
+                  : formatCurrency(totalRevenue)}
               </p>
             </div>
           </div>
@@ -246,9 +308,15 @@ export default function Reports() {
               </div>
               <div className="text-right">
                 <p className="text-lg font-bold text-success">
-                  R$ {(broker.revenue / 1000000).toFixed(2)}M
+                  {broker.revenue > 0 
+                    ? broker.revenue > 1000000
+                      ? `R$ ${(broker.revenue / 1000000).toFixed(2)}M`
+                      : formatCurrency(broker.revenue)
+                    : "N/A"}
                 </p>
-                <p className="text-xs text-muted-foreground">em vendas</p>
+                <p className="text-xs text-muted-foreground">
+                  {broker.revenue > 0 ? "em vendas" : broker.deals > 0 ? "negócios" : ""}
+                </p>
               </div>
             </div>
           ))}

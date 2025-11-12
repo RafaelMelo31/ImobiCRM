@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -22,81 +23,69 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Phone, Mail, Building2, MapPin } from "lucide-react";
 import { toast } from "sonner";
-
-interface Owner {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  properties: number;
-  city: string;
-  lastContact: string;
-  status: "active" | "inactive";
-}
-
-const mockOwners: Owner[] = [
-  {
-    id: "1",
-    name: "Roberto Almeida",
-    email: "roberto@email.com",
-    phone: "(11) 98765-1111",
-    properties: 3,
-    city: "São Paulo",
-    lastContact: "2024-01-10",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Maria Santos",
-    email: "maria@email.com",
-    phone: "(11) 98765-2222",
-    properties: 1,
-    city: "Campinas",
-    lastContact: "2024-01-08",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "José Ferreira",
-    email: "jose@email.com",
-    phone: "(11) 98765-3333",
-    properties: 5,
-    city: "Santos",
-    lastContact: "2023-12-20",
-    status: "inactive",
-  },
-  {
-    id: "4",
-    name: "Patricia Lima",
-    email: "patricia@email.com",
-    phone: "(11) 98765-4444",
-    properties: 2,
-    city: "São Paulo",
-    lastContact: "2024-01-12",
-    status: "active",
-  },
-];
+import { useOwners, useCreateOwner } from "@/hooks/useOwners";
+import { ownerStatusMap, formatDate } from "@/lib/mappers";
 
 export default function Owners() {
-  const [owners, setOwners] = useState<Owner[]>(mockOwners);
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState("");
+  const [city, setCity] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const { data: owners = [], isLoading } = useOwners();
+  const createOwner = useCreateOwner();
 
   const filteredOwners = owners.filter(
     (owner) =>
       owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      owner.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      owner.city.toLowerCase().includes(searchTerm.toLowerCase())
+      (owner.email && owner.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (owner.address && owner.address.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleAddOwner = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddOwner = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    toast.success("Proprietário adicionado com sucesso!");
-    setIsDialogOpen(false);
+    
+    try {
+      await createOwner.mutateAsync({
+        name,
+        email: email || null,
+        phone,
+        cpf_cnpj: cpfCnpj || null,
+        address: city || null,
+        status: "ativo" as const,
+        notes: notes || null,
+      });
+      toast.success("Proprietário adicionado com sucesso!");
+      setIsDialogOpen(false);
+      setName("");
+      setEmail("");
+      setPhone("");
+      setCpfCnpj("");
+      setCity("");
+      setNotes("");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao adicionar proprietário");
+      console.error(error);
+    }
   };
 
-  const totalProperties = owners.reduce((sum, o) => sum + o.properties, 0);
-  const activeOwners = owners.filter((o) => o.status === "active").length;
+  const totalProperties = owners.reduce((sum, o) => sum + (o.propertiesCount || 0), 0);
+  const activeOwners = owners.filter((o) => o.status === "ativo").length;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Carregando proprietários...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -122,7 +111,13 @@ export default function Owners() {
             <form onSubmit={handleAddOwner} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Nome Completo</Label>
-                <Input id="name" placeholder="Ex: João Silva" required />
+                <Input 
+                  id="name" 
+                  placeholder="Ex: João Silva" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -130,7 +125,8 @@ export default function Owners() {
                   id="email"
                   type="email"
                   placeholder="joao@email.com"
-                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -139,12 +135,28 @@ export default function Owners() {
                   id="phone"
                   type="tel"
                   placeholder="(11) 98765-4321"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="city">Cidade</Label>
-                <Input id="city" placeholder="São Paulo" required />
+                <Label htmlFor="cpfCnpj">CPF/CNPJ</Label>
+                <Input
+                  id="cpfCnpj"
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  value={cpfCnpj}
+                  onChange={(e) => setCpfCnpj(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="city">Endereço/Cidade</Label>
+                <Input 
+                  id="city" 
+                  placeholder="São Paulo" 
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="notes">Observações</Label>
@@ -152,10 +164,16 @@ export default function Owners() {
                   id="notes"
                   placeholder="Informações adicionais..."
                   rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Adicionar Proprietário
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={createOwner.isPending}
+              >
+                {createOwner.isPending ? "Adicionando..." : "Adicionar Proprietário"}
               </Button>
             </form>
           </DialogContent>
@@ -226,49 +244,65 @@ export default function Owners() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOwners.map((owner) => (
-                <TableRow key={owner.id} className="cursor-pointer hover:bg-muted/50">
-                  <TableCell>
-                    <span className="font-medium">{owner.name}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">{owner.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">{owner.phone}</span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{owner.city}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">{owner.properties}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-muted-foreground">
-                      {new Date(owner.lastContact).toLocaleDateString("pt-BR")}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={owner.status === "active" ? "default" : "secondary"}
-                    >
-                      {owner.status === "active" ? "Ativo" : "Inativo"}
-                    </Badge>
+              {filteredOwners.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    Nenhum proprietário encontrado.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredOwners.map((owner) => (
+                  <TableRow 
+                    key={owner.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/owners/${owner.id}`)}
+                  >
+                    <TableCell>
+                      <span className="font-medium">{owner.name}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {owner.email && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">{owner.email}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{owner.phone}</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {owner.address && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span>{owner.address}</span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-primary" />
+                        <span className="font-semibold">{owner.propertiesCount || 0}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-muted-foreground">
+                        {formatDate(owner.updated_at)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={owner.status === "ativo" ? "default" : "secondary"}
+                      >
+                        {ownerStatusMap[owner.status] || owner.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>

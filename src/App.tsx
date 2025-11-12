@@ -11,8 +11,10 @@ import Leads from "./pages/Leads";
 import LeadProfile from "./pages/LeadProfile";
 import Kanban from "./pages/Kanban";
 import Properties from "./pages/Properties";
+import PropertyProfile from "./pages/PropertyProfile";
 import Brokers from "./pages/Brokers";
 import Owners from "./pages/Owners";
+import OwnerProfile from "./pages/OwnerProfile";
 import Calendar from "./pages/Calendar";
 import Reports from "./pages/Reports";
 import Login from "./pages/Login";
@@ -80,6 +82,16 @@ const App = () => (
               }
             />
             <Route
+              path="/properties/:id"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <PropertyProfile />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/brokers"
               element={
                 <ProtectedRoute>
@@ -95,6 +107,16 @@ const App = () => (
                 <ProtectedRoute>
                   <DashboardLayout>
                     <Owners />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/owners/:id"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <OwnerProfile />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
