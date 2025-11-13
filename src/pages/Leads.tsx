@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useLeads, useCreateLead } from "@/hooks/useLeads";
+import { useLeads, useCreateLead, useCreateBulkLeads } from "@/hooks/useLeads";
 import { useBrokers } from "@/hooks/useBrokers";
 import { getLeadStatusFromLabel, getLeadOriginFromLabel } from "@/lib/mappers";
 import { toast } from "sonner";
@@ -90,6 +90,9 @@ export default function Leads() {
   const { data: leads, isLoading } = useLeads();
   const { data: brokers } = useBrokers();
   const createLead = useCreateLead();
+  const createBulkLeads = useCreateBulkLeads();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const brokerMap = useMemo(() => {
     if (!brokers) return {};
@@ -109,9 +112,10 @@ export default function Leads() {
     
     return leads.filter((lead) => {
       const matchesSearch = 
+        searchTerm === "" ||
         lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        lead.phone.includes(searchTerm);
+        (lead.phone && lead.phone.includes(searchTerm));
       
       const matchesStatus = statusFilter === "Todos" || lead.status === statusFilter;
       const matchesOrigin = originFilter === "Todas" || lead.origin === originFilter;
@@ -196,6 +200,232 @@ export default function Leads() {
     }
   };
 
+  const handleExportLeads = () => {
+    try {
+      if (filteredLeads.length === 0) {
+        toast.error("Não há leads para exportar");
+        return;
+      }
+
+      // Criar cabeçalhos do CSV
+      const headers = [
+        "Nome",
+        "Email",
+        "Telefone",
+        "Status",
+        "Origem",
+        "Corretor",
+        "Orçamento",
+        "Tags",
+        "Observações",
+        "Data de Criação"
+      ];
+
+      // Converter leads para CSV
+      const csvRows = [
+        headers.join(","),
+        ...filteredLeads.map((lead) => {
+          const row = [
+            `"${(lead.name || "").replace(/"/g, '""')}"`,
+            `"${(lead.email || "").replace(/"/g, '""')}"`,
+            `"${(lead.phone || "").replace(/"/g, '""')}"`,
+            `"${statusLabels[lead.status] || lead.status}"`,
+            `"${originLabels[lead.origin] || lead.origin}"`,
+            `"${lead.assigned_broker_id ? (brokerMap[lead.assigned_broker_id] || "") : ""}"`,
+            lead.budget ? `"${lead.budget.toFixed(2).replace(".", ",")}"` : '""',
+            `"${(lead.tags?.join(", ") || "").replace(/"/g, '""')}"`,
+            `"${(lead.notes || "").replace(/"/g, '""')}"`,
+            `"${new Date(lead.created_at).toLocaleDateString("pt-BR")}"`,
+          ];
+          return row.join(",");
+        }),
+      ];
+
+      const csvContent = csvRows.join("\n");
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `leads_${new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      toast.success(`${filteredLeads.length} lead(s) exportado(s) com sucesso!`);
+    } catch (error: any) {
+      toast.error("Erro ao exportar leads: " + error.message);
+      console.error(error);
+    }
+  };
+
+  const handleImportLeads = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar extensão do arquivo
+    if (!file.name.endsWith(".csv")) {
+      toast.error("Por favor, selecione um arquivo CSV");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        toast.error("O arquivo CSV está vazio ou inválido");
+        return;
+      }
+
+      // Remover BOM se presente
+      const firstLine = lines[0].replace(/^\uFEFF/, "");
+      
+      // Pular cabeçalho e processar linhas
+      const rows = lines.slice(1);
+      const leadsToImport: any[] = [];
+      const errors: string[] = [];
+
+      // Mapeamento reverso de labels para valores
+      const statusMapReverse: Record<string, string> = {
+        "Novo Lead": "novo",
+        "Em Atendimento": "contatado",
+        "Contatado": "contatado",
+        "Qualificado": "qualificado",
+        "Visita Agendada": "visita_agendada",
+        "Proposta Enviada": "proposta_enviada",
+        "Em Negociação": "negociacao",
+        "Negociação": "negociacao",
+        "Venda": "fechado",
+        "Fechado": "fechado",
+        "Perdido": "perdido",
+      };
+
+      const originMapReverse: Record<string, string> = {
+        "Site": "site",
+        "Indicação": "indicacao",
+        "Facebook": "facebook",
+        "Instagram": "instagram",
+        "Google": "google",
+        "WhatsApp": "whatsapp",
+        "E-mail": "email",
+        "Evento": "evento",
+        "Outro": "outro",
+      };
+
+      rows.forEach((row, index) => {
+        try {
+          // Parse CSV simples (considerando aspas)
+          const values: string[] = [];
+          let current = "";
+          let inQuotes = false;
+
+          for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            if (char === '"') {
+              if (inQuotes && row[i + 1] === '"') {
+                current += '"';
+                i++;
+              } else {
+                inQuotes = !inQuotes;
+              }
+            } else if (char === "," && !inQuotes) {
+              values.push(current.trim());
+              current = "";
+            } else {
+              current += char;
+            }
+          }
+          values.push(current.trim());
+
+          const [
+            name,
+            email,
+            phone,
+            statusLabel,
+            originLabel,
+            brokerName,
+            budgetStr,
+            tagsStr,
+            notes,
+          ] = values;
+
+          if (!name || !phone) {
+            errors.push(`Linha ${index + 2}: Nome e telefone são obrigatórios`);
+            return;
+          }
+
+          // Converter labels para valores do banco
+          const status = statusMapReverse[statusLabel] || "novo";
+          const origin = originMapReverse[originLabel] || "site";
+
+          // Buscar ID do corretor pelo nome
+          let brokerId = null;
+          if (brokerName) {
+            const broker = brokers?.find((b) => b.name === brokerName);
+            brokerId = broker?.id || null;
+          }
+
+          // Converter orçamento
+          let budget = null;
+          if (budgetStr) {
+            const budgetClean = budgetStr.replace(/[^\d,.-]/g, "").replace(",", ".");
+            const budgetNum = parseFloat(budgetClean);
+            if (!isNaN(budgetNum) && budgetNum > 0) {
+              budget = budgetNum;
+            }
+          }
+
+          // Processar tags
+          const tagsArray = tagsStr
+            ? tagsStr.split(",").map((t) => t.trim()).filter((t) => t)
+            : null;
+
+          leadsToImport.push({
+            name: name.replace(/^"|"$/g, ""),
+            email: email?.replace(/^"|"$/g, "") || null,
+            phone: phone.replace(/^"|"$/g, ""),
+            status: status as any,
+            origin: origin as any,
+            assigned_broker_id: brokerId,
+            budget,
+            tags: tagsArray,
+            notes: notes?.replace(/^"|"$/g, "") || null,
+          });
+        } catch (error) {
+          errors.push(`Linha ${index + 2}: Erro ao processar - ${error}`);
+        }
+      });
+
+      if (leadsToImport.length === 0) {
+        toast.error("Nenhum lead válido encontrado no arquivo");
+        return;
+      }
+
+      if (errors.length > 0) {
+        console.warn("Erros encontrados durante a importação:", errors);
+      }
+
+      // Importar leads
+      await createBulkLeads.mutateAsync(leadsToImport);
+      setIsImportDialogOpen(false);
+
+      if (errors.length > 0) {
+        toast.warning(
+          `${leadsToImport.length} lead(s) importado(s), mas ${errors.length} erro(s) foram encontrados. Verifique o console para mais detalhes.`
+        );
+      } else {
+        toast.success(`${leadsToImport.length} lead(s) importado(s) com sucesso!`);
+      }
+    } catch (error: any) {
+      toast.error("Erro ao importar leads: " + error.message);
+      console.error(error);
+    } finally {
+      // Limpar input de arquivo
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -206,11 +436,42 @@ export default function Leads() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />
-            Importar
-          </Button>
-          <Button variant="outline" size="sm">
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Importar Leads</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="csv-file">Selecione o arquivo CSV</Label>
+                  <Input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv"
+                    ref={fileInputRef}
+                    onChange={handleImportLeads}
+                    disabled={createBulkLeads.isPending}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    O arquivo CSV deve conter as colunas: Nome, Email, Telefone, Status, Origem, Corretor, Orçamento, Tags, Observações
+                  </p>
+                </div>
+                {createBulkLeads.isPending && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importando leads...
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" size="sm" onClick={handleExportLeads} disabled={filteredLeads.length === 0}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>

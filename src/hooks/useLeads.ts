@@ -113,6 +113,28 @@ export const useCreateLead = () => {
   });
 };
 
+export const useCreateBulkLeads = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (leads: DbLeadInsert[]) => {
+      const { data, error } = await supabase
+        .from("leads")
+        .insert(leads)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao importar leads: " + error.message);
+    },
+  });
+};
+
 export const useUpdateLead = () => {
   const queryClient = useQueryClient();
   

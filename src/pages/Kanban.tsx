@@ -320,7 +320,7 @@ export default function KanbanBoard() {
         searchTerm === '' ||
         lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        lead.phone.includes(searchTerm);
+        (lead.phone && lead.phone.includes(searchTerm));
 
       const matchesBroker =
         brokerFilter === 'Todos' || lead.assigned_broker_id === brokerFilter;
@@ -394,7 +394,7 @@ export default function KanbanBoard() {
     });
 
     return cols;
-  }, [leads, events]);
+  }, [filteredLeads, events]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -557,9 +557,8 @@ export default function KanbanBoard() {
         onDragEnd={handleDragEnd}
       >
         <div
-          className="flex gap-6 overflow-x-auto pb-4 w-full"
+          className="flex gap-6 overflow-x-auto pb-4 w-full custom-scrollbar"
           style={{
-            scrollbarWidth: 'thin',
             WebkitOverflowScrolling: 'touch',
           }}
         >

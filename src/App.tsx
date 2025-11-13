@@ -18,6 +18,7 @@ import Owners from "./pages/Owners";
 import OwnerProfile from "./pages/OwnerProfile";
 import Calendar from "./pages/Calendar";
 import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -139,6 +140,16 @@ const App = () => (
                 <ProtectedRoute>
                   <DashboardLayout>
                     <Reports />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Settings />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

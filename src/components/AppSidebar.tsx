@@ -1,4 +1,4 @@
-import { Home, Users, Building2, UserCircle, Calendar, BarChart3, Layers, Briefcase } from "lucide-react";
+import { Home, Users, Building2, UserCircle, Calendar, BarChart3, Layers, Briefcase, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ const menuItems = [
   { title: "Corretores", url: "/brokers", icon: Briefcase },
   { title: "Agenda", url: "/calendar", icon: Calendar },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
+  { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
