@@ -185,7 +185,7 @@ function HeaderContent() {
 
   return (
     <header 
-      className="h-16 border-b border-border bg-card fixed top-0 z-0 backdrop-blur-sm bg-card/95 transition-all duration-300 ease-in-out"
+      className="h-16 border-b border-border bg-card fixed top-0 z-50 backdrop-blur-sm bg-card/95 transition-all duration-300 ease-in-out"
       style={{ 
         left: 0,
         right: 0,

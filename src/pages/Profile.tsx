@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { 
   User, 
   Mail, 
@@ -12,15 +13,13 @@ import {
   Save, 
   Edit2,
   Camera,
-  Users,
-  TrendingUp,
-  Award,
+  Check,
+  X,
+  Shield,
   Clock
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLeads } from "@/hooks/useLeads";
-import { useEvents } from "@/hooks/useEvents";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,8 +28,6 @@ import { formatDateTime } from "@/lib/mappers";
 export default function Profile() {
   const { data: profile, isLoading: isLoadingProfile } = useProfile();
   const { user } = useAuth();
-  const { data: leads = [] } = useLeads();
-  const { data: events = [] } = useEvents();
   const queryClient = useQueryClient();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -42,24 +39,6 @@ export default function Profile() {
       setName(profile.name || "");
     }
   }, [profile]);
-
-  // Calcular estatísticas do usuário
-  const userStats = {
-    totalLeads: leads.length,
-    activeLeads: leads.filter(
-      (lead) => lead.status !== "fechado" && lead.status !== "perdido"
-    ).length,
-    closedDeals: leads.filter((lead) => lead.status === "fechado").length,
-    totalEvents: events.length,
-    upcomingEvents: events.filter((event) => {
-      const eventDate = new Date(event.start_time);
-      return eventDate >= new Date();
-    }).length,
-  };
-
-  const conversionRate = userStats.totalLeads > 0
-    ? Math.round((userStats.closedDeals / userStats.totalLeads) * 100)
-    : 0;
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -105,123 +84,218 @@ export default function Profile() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando perfil...</p>
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-muted-foreground">Carregando perfil...</p>
+          </div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <User className="h-8 w-8" />
-          Meu Perfil
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Gerencie suas informações pessoais e visualize suas estatísticas
-        </p>
-      </div>
+  const getInitials = (name: string) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Informações do Perfil */}
-        <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Informações Pessoais</CardTitle>
+  const getDaysSinceJoined = () => {
+    if (!profile?.created_at) return null;
+    const created = new Date(profile.created_at);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - created.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const daysSinceJoined = getDaysSinceJoined();
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header com Banner */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 border border-primary/20">
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
+          backgroundSize: '24px 24px'
+        }} />
+        <div className="relative p-8 md:p-12">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+            {/* Avatar Grande */}
+            <div className="relative group">
+              <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-background shadow-xl">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.name || "Usuário"} />
+                <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-4xl font-bold">
+                  {getInitials(profile?.name || "")}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute inset-0 rounded-full bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-full bg-background/90 hover:bg-background"
+                  disabled
+                >
+                  <Camera className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Informações do Header */}
+            <div className="flex-1 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                      {profile?.name || "Usuário"}
+                    </h1>
+                    {profile && (
+                      <Badge variant="secondary" className="gap-1.5">
+                        <Shield className="h-3 w-3" />
+                        Verificado
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <span className="text-sm">{user?.email || "Não informado"}</span>
+                    </div>
+                  </div>
                 </div>
                 {!isEditing && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsEditing(true)}
-                    className="gap-2"
+                    className="gap-2 shrink-0"
                   >
                     <Edit2 className="h-4 w-4" />
-                    Editar
+                    Editar Perfil
                   </Button>
                 )}
               </div>
-              <CardDescription>
-                Atualize suas informações pessoais
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Avatar */}
-              <div className="flex items-center gap-6">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.name || "Usuário"} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-2xl font-medium">
-                    {profile?.name 
-                      ? profile.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-                      : "U"
-                    }
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <Label className="text-sm text-muted-foreground mb-2 block">
-                    Foto de Perfil
-                  </Label>
-                  <Button variant="outline" size="sm" className="gap-2" disabled>
-                    <Camera className="h-4 w-4" />
-                    Alterar Foto
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Em breve você poderá fazer upload de uma foto
-                  </p>
+
+              {/* Informações Adicionais */}
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                {profile?.created_at && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Membro desde {formatDateTime(profile.created_at)}</span>
+                  </div>
+                )}
+                {daysSinceJoined && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>{daysSinceJoined} {daysSinceJoined === 1 ? 'dia' : 'dias'} na plataforma</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Card de Informações */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Informações Pessoais</CardTitle>
+                  <CardDescription>
+                    Gerencie suas informações de perfil
+                  </CardDescription>
                 </div>
               </div>
-
-              <Separator />
-
-              {/* Nome */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome Completo</Label>
-                {isEditing ? (
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Seu nome completo"
-                  />
-                ) : (
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Nome */}
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-base font-semibold">
+                Nome Completo
+              </Label>
+              {isEditing ? (
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Seu nome completo"
+                  className="h-11"
+                />
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-transparent hover:border-border transition-colors">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">{profile?.name || "Não informado"}</p>
-                )}
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">{user?.email || "Não informado"}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  O email não pode ser alterado aqui
-                </p>
-              </div>
+              )}
+            </div>
 
-              {/* Data de Criação */}
-              <div className="space-y-2">
-                <Label>Membro desde</Label>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">
-                    {profile?.created_at 
-                      ? formatDateTime(profile.created_at)
-                      : "Não informado"
-                    }
+            <Separator />
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-base font-semibold">
+                Email
+              </Label>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-transparent">
+                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{user?.email || "Não informado"}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    O email não pode ser alterado aqui. Entre em contato com o suporte para alterações.
                   </p>
                 </div>
               </div>
+            </div>
 
-              {/* Botões de ação */}
-              {isEditing && (
-                <div className="flex gap-2 pt-4">
+            <Separator />
+
+            {/* Data de Criação */}
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">
+                Informações da Conta
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-transparent">
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Data de Criação</p>
+                    <p className="text-sm font-medium">
+                      {profile?.created_at 
+                        ? formatDateTime(profile.created_at)
+                        : "Não informado"
+                      }
+                    </p>
+                  </div>
+                </div>
+                {profile?.updated_at && profile.updated_at !== profile.created_at && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-transparent">
+                    <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Última Atualização</p>
+                      <p className="text-sm font-medium">
+                        {formatDateTime(profile.updated_at)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Botões de ação */}
+            {isEditing && (
+              <>
+                <Separator />
+                <div className="flex gap-3 pt-2">
                   <Button
                     onClick={handleSave}
                     disabled={isSaving}
@@ -234,103 +308,17 @@ export default function Profile() {
                     variant="outline"
                     onClick={handleCancel}
                     disabled={isSaving}
+                    className="gap-2"
                   >
+                    <X className="h-4 w-4" />
                     Cancelar
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Estatísticas */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Estatísticas</CardTitle>
-              <CardDescription>
-                Suas métricas de desempenho
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Users className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total de Leads</p>
-                      <p className="text-xl font-bold">{userStats.totalLeads}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-500/10">
-                      <TrendingUp className="h-4 w-4 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Leads Ativos</p>
-                      <p className="text-xl font-bold">{userStats.activeLeads}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-success/10">
-                      <Award className="h-4 w-4 text-success" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Negócios Fechados</p>
-                      <p className="text-xl font-bold">{userStats.closedDeals}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-accent/10">
-                      <TrendingUp className="h-4 w-4 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                      <p className="text-xl font-bold">{conversionRate}%</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-500/10">
-                      <Calendar className="h-4 w-4 text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total de Eventos</p>
-                      <p className="text-xl font-bold">{userStats.totalEvents}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-orange-500/10">
-                      <Clock className="h-4 w-4 text-orange-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Próximos Eventos</p>
-                      <p className="text-xl font-bold">{userStats.upcomingEvents}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
-
