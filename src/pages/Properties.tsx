@@ -53,6 +53,18 @@ export default function Properties() {
   const [searchTerm, setSearchTerm] = useState("");
   const { data: properties, isLoading } = useProperties();
   
+  // Estados dos Filtros Avançados
+  const [isFiltersDialogOpen, setIsFiltersDialogOpen] = useState(false);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterMinPrice, setFilterMinPrice] = useState("");
+  const [filterMaxPrice, setFilterMaxPrice] = useState("");
+  const [filterMinBedrooms, setFilterMinBedrooms] = useState("");
+  const [filterMinBathrooms, setFilterMinBathrooms] = useState("");
+  const [filterMinArea, setFilterMinArea] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [filterState, setFilterState] = useState("");
+  
   // Estados do Dialog de adicionar imóvel
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -82,15 +94,7 @@ export default function Properties() {
   const [ownerCity, setOwnerCity] = useState("");
   const [ownerNotes, setOwnerNotes] = useState("");
 
-  const filteredProperties = useMemo(() => {
-    if (!properties) return [];
-    return properties.filter(property =>
-      property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.city.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [properties, searchTerm]);
-
+  // Funções auxiliares para formatação e parsing de preço
   const formatPriceInput = (value: string) => {
     // Remove tudo exceto dígitos, vírgula e ponto
     // Permite múltiplas vírgulas e pontos para flexibilidade
@@ -100,64 +104,144 @@ export default function Properties() {
   const parsePriceValue = (priceStr: string): number | null => {
     if (!priceStr.trim()) return null;
     
-    // Remove espaços e caracteres não numéricos exceto vírgula e ponto
-    let cleaned = priceStr.trim().replace(/[^\d,.]/g, "");
-    
-    // Encontra a última vírgula e o último ponto
-    const lastCommaIndex = cleaned.lastIndexOf(",");
-    const lastDotIndex = cleaned.lastIndexOf(".");
-    
-    if (lastCommaIndex !== -1 && lastDotIndex !== -1) {
-      // Tem ambos vírgula e ponto
-      // Determina qual é o separador decimal (o que vem por último geralmente)
-      if (lastCommaIndex > lastDotIndex) {
-        // Vírgula vem por último: formato BR (ex: 1.234,56 ou 900.000,00)
-        // Remove todos os pontos (separadores de milhares) e substitui vírgula por ponto
-        const beforeComma = cleaned.substring(0, lastCommaIndex);
-        const afterComma = cleaned.substring(lastCommaIndex + 1);
-        
-        // Detecta padrão como "900.00,00" (3 dígitos, ponto, dois zeros, vírgula, dois zeros)
-        // Nesse caso, o usuário provavelmente quer 900.000,00 (adiciona zeros)
-        const patternMatch = beforeComma.match(/^(\d{1,3})\.00$/);
-        let digitsBeforeComma = beforeComma.replace(/\./g, "");
-        
-        if (patternMatch) {
-          // Padrão "900.00" -> interpreta como "900000" (adiciona zeros)
-          const baseDigits = patternMatch[1]; // "900"
-          digitsBeforeComma = baseDigits + "000"; // "900000"
+    try {
+      // Remove espaços e caracteres não numéricos exceto vírgula e ponto
+      let cleaned = priceStr.trim().replace(/[^\d,.]/g, "");
+      
+      // Encontra a última vírgula e o último ponto
+      const lastCommaIndex = cleaned.lastIndexOf(",");
+      const lastDotIndex = cleaned.lastIndexOf(".");
+      
+      if (lastCommaIndex !== -1 && lastDotIndex !== -1) {
+        // Tem ambos vírgula e ponto
+        // Determina qual é o separador decimal (o que vem por último geralmente)
+        if (lastCommaIndex > lastDotIndex) {
+          // Vírgula vem por último: formato BR (ex: 1.234,56 ou 900.000,00)
+          // Remove todos os pontos (separadores de milhares) e substitui vírgula por ponto
+          const beforeComma = cleaned.substring(0, lastCommaIndex);
+          const afterComma = cleaned.substring(lastCommaIndex + 1);
+          
+          // Detecta padrão como "900.00,00" (3 dígitos, ponto, dois zeros, vírgula, dois zeros)
+          // Nesse caso, o usuário provavelmente quer 900.000,00 (adiciona zeros)
+          const patternMatch = beforeComma.match(/^(\d{1,3})\.00$/);
+          let digitsBeforeComma = beforeComma.replace(/\./g, "");
+          
+          if (patternMatch) {
+            // Padrão "900.00" -> interpreta como "900000" (adiciona zeros)
+            const baseDigits = patternMatch[1]; // "900"
+            digitsBeforeComma = baseDigits + "000"; // "900000"
+          }
+          
+          cleaned = digitsBeforeComma + "." + afterComma;
+        } else {
+          // Ponto vem por último: formato US (ex: 1,234.56)
+          // Remove todas as vírgulas (separadores de milhares)
+          cleaned = cleaned.replace(/,/g, "");
         }
-        
-        cleaned = digitsBeforeComma + "." + afterComma;
-      } else {
-        // Ponto vem por último: formato US (ex: 1,234.56)
-        // Remove todas as vírgulas (separadores de milhares)
-        cleaned = cleaned.replace(/,/g, "");
+      } else if (lastCommaIndex !== -1) {
+        // Só tem vírgula
+        const afterComma = cleaned.substring(lastCommaIndex + 1);
+        if (afterComma.length <= 2) {
+          // 2 ou menos dígitos após vírgula = formato BR (decimal)
+          cleaned = cleaned.replace(",", ".");
+        } else {
+          // Mais de 2 dígitos = provavelmente separador de milhares, remove
+          cleaned = cleaned.replace(/,/g, "");
+        }
+      } else if (lastDotIndex !== -1) {
+        // Só tem ponto
+        const afterDot = cleaned.substring(lastDotIndex + 1);
+        if (afterDot.length <= 2) {
+          // 2 ou menos dígitos após ponto = formato US (decimal), mantém
+          // Não precisa fazer nada
+        } else {
+          // Mais de 2 dígitos = provavelmente separador de milhares, remove
+          cleaned = cleaned.replace(/\./g, "");
+        }
       }
-    } else if (lastCommaIndex !== -1) {
-      // Só tem vírgula
-      const afterComma = cleaned.substring(lastCommaIndex + 1);
-      if (afterComma.length <= 2) {
-        // 2 ou menos dígitos após vírgula = formato BR (decimal)
-        cleaned = cleaned.replace(",", ".");
-      } else {
-        // Mais de 2 dígitos = provavelmente separador de milhares, remove
-        cleaned = cleaned.replace(/,/g, "");
-      }
-    } else if (lastDotIndex !== -1) {
-      // Só tem ponto
-      const afterDot = cleaned.substring(lastDotIndex + 1);
-      if (afterDot.length <= 2) {
-        // 2 ou menos dígitos após ponto = formato US (decimal), mantém
-        // Não precisa fazer nada
-      } else {
-        // Mais de 2 dígitos = provavelmente separador de milhares, remove
-        cleaned = cleaned.replace(/\./g, "");
-      }
+      
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) || parsed <= 0 ? null : parsed;
+    } catch (error) {
+      return null;
     }
-    
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) || parsed <= 0 ? null : parsed;
   };
+
+  const filteredProperties = useMemo(() => {
+    if (!properties) return [];
+    
+    return properties.filter(property => {
+      // Filtro de busca por texto
+      const matchesSearch = 
+        property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        property.city.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      
+      // Filtro por tipo
+      if (filterType !== "all" && property.property_type !== filterType) {
+        return false;
+      }
+      
+      // Filtro por status
+      if (filterStatus !== "all" && property.status !== filterStatus) {
+        return false;
+      }
+      
+      // Filtro por preço mínimo
+      if (filterMinPrice.trim()) {
+        const minPrice = parsePriceValue(filterMinPrice);
+        if (minPrice !== null && (!property.price || property.price < minPrice)) {
+          return false;
+        }
+      }
+      
+      // Filtro por preço máximo
+      if (filterMaxPrice.trim()) {
+        const maxPrice = parsePriceValue(filterMaxPrice);
+        if (maxPrice !== null && (!property.price || property.price > maxPrice)) {
+          return false;
+        }
+      }
+      
+      // Filtro por quartos mínimo
+      if (filterMinBedrooms.trim()) {
+        const minBedrooms = parseInt(filterMinBedrooms);
+        if (!isNaN(minBedrooms) && (!property.bedrooms || property.bedrooms < minBedrooms)) {
+          return false;
+        }
+      }
+      
+      // Filtro por banheiros mínimo
+      if (filterMinBathrooms.trim()) {
+        const minBathrooms = parseInt(filterMinBathrooms);
+        if (!isNaN(minBathrooms) && (!property.bathrooms || property.bathrooms < minBathrooms)) {
+          return false;
+        }
+      }
+      
+      // Filtro por área mínima
+      if (filterMinArea.trim()) {
+        const minArea = parseFloat(filterMinArea.replace(",", "."));
+        if (!isNaN(minArea) && (!property.area || property.area < minArea)) {
+          return false;
+        }
+      }
+      
+      // Filtro por cidade
+      if (filterCity.trim() && !property.city.toLowerCase().includes(filterCity.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro por estado
+      if (filterState.trim() && !property.state.toLowerCase().includes(filterState.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [properties, searchTerm, filterType, filterStatus, filterMinPrice, filterMaxPrice, filterMinBedrooms, filterMinBathrooms, filterMinArea, filterCity, filterState]);
 
   const handleAddProperty = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -543,15 +627,172 @@ export default function Properties() {
               />
             </div>
             
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filtros Avançados
-            </Button>
+            <Dialog open={isFiltersDialogOpen} onOpenChange={setIsFiltersDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filtros Avançados
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Filtros Avançados</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="filterType">Tipo de Imóvel</Label>
+                      <Select value={filterType} onValueChange={setFilterType}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {propertyTypeOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filterStatus">Status</Label>
+                      <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {propertyStatusOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="filterMinPrice">Preço Mínimo</Label>
+                      <Input
+                        id="filterMinPrice"
+                        placeholder="Ex: 200.000,00"
+                        value={filterMinPrice}
+                        onChange={(e) => setFilterMinPrice(formatPriceInput(e.target.value))}
+                        className="bg-background text-foreground"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filterMaxPrice">Preço Máximo</Label>
+                      <Input
+                        id="filterMaxPrice"
+                        placeholder="Ex: 500.000,00"
+                        value={filterMaxPrice}
+                        onChange={(e) => setFilterMaxPrice(formatPriceInput(e.target.value))}
+                        className="bg-background text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="filterMinBedrooms">Quartos (mínimo)</Label>
+                      <Input
+                        id="filterMinBedrooms"
+                        type="number"
+                        placeholder="Ex: 2"
+                        value={filterMinBedrooms}
+                        onChange={(e) => setFilterMinBedrooms(e.target.value)}
+                        min="0"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filterMinBathrooms">Banheiros (mínimo)</Label>
+                      <Input
+                        id="filterMinBathrooms"
+                        type="number"
+                        placeholder="Ex: 2"
+                        value={filterMinBathrooms}
+                        onChange={(e) => setFilterMinBathrooms(e.target.value)}
+                        min="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filterMinArea">Área Mínima (m²)</Label>
+                    <Input
+                      id="filterMinArea"
+                      placeholder="Ex: 80"
+                      value={filterMinArea}
+                      onChange={(e) => setFilterMinArea(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="filterCity">Cidade</Label>
+                      <Input
+                        id="filterCity"
+                        placeholder="Ex: São Paulo"
+                        value={filterCity}
+                        onChange={(e) => setFilterCity(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filterState">Estado</Label>
+                      <Input
+                        id="filterState"
+                        placeholder="Ex: SP"
+                        value={filterState}
+                        onChange={(e) => setFilterState(e.target.value)}
+                        maxLength={2}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setFilterType("all");
+                        setFilterStatus("all");
+                        setFilterMinPrice("");
+                        setFilterMaxPrice("");
+                        setFilterMinBedrooms("");
+                        setFilterMinBathrooms("");
+                        setFilterMinArea("");
+                        setFilterCity("");
+                        setFilterState("");
+                      }}
+                    >
+                      Limpar Filtros
+                    </Button>
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      onClick={() => setIsFiltersDialogOpen(false)}
+                    >
+                      Aplicar Filtros
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoading ? (
           <div className="col-span-full flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />

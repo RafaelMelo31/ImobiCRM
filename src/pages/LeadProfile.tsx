@@ -30,7 +30,7 @@ import { leadStatusMap, leadOriginMap, formatCurrency, formatDateTime, getLeadSt
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const statusOptionsForm = ["Novo Lead", "Em Atendimento", "Visita Agendada", "Em Negociação", "Venda", "Perdido"];
+const statusOptionsForm = ["Novo Lead", "Em Atendimento", "Qualificado", "Visita Agendada", "Em Negociação", "Venda", "Perdido"];
 const originOptionsForm = ["Facebook Ads", "Instagram", "Google Ads", "WhatsApp", "Site", "Indicação", "Outro"];
 
 export default function LeadProfile() {
