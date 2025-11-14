@@ -180,16 +180,17 @@ function HeaderContent() {
     searchResults.owners.length > 0;
 
   // Calcular a posição left baseado no estado da sidebar
-  // Sidebar expandida: w-60 (240px), colapsada: w-14 (56px) - valores do AppSidebar.tsx
-  const sidebarWidth = open ? 240 : 56;
+  // Sidebar expandida: w-52 (208px), colapsada: w-14 (56px) - valores do AppSidebar.tsx
+  const sidebarWidth = open ? 208 : 56;
 
   return (
     <header 
-      className="h-16 border-b border-border bg-card fixed top-0 z-50 backdrop-blur-sm bg-card/95 transition-all duration-300 ease-in-out"
+      className="h-16 border-b border-border bg-card fixed top-0 z-0 backdrop-blur-sm bg-card/95 transition-all duration-300 ease-in-out"
       style={{ 
-        left: `${sidebarWidth}px`,
+        left: 0,
         right: 0,
-        width: `calc(100% - ${sidebarWidth}px)`
+        width: '100%',
+        paddingLeft: `${sidebarWidth}px`
       }}
     >
       <div className="h-full px-6 flex items-center justify-between gap-4 max-w-full overflow-hidden">

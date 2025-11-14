@@ -30,7 +30,7 @@ export function AppSidebar() {
   const location = useLocation();
 
   return (
-    <Sidebar className={open ? "w-60" : "w-14"} collapsible="icon">
+    <Sidebar className={open ? "w-52" : "w-14"} collapsible="icon">
       <SidebarContent>
         <div className="px-4 py-5 border-b border-sidebar-border">
           {open ? (
