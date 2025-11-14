@@ -6,7 +6,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import {
   BarChart,
   Bar,
@@ -22,25 +21,12 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Download, TrendingUp, Users, Target, DollarSign } from "lucide-react";
+import { TrendingUp, Users, Target, DollarSign } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useLeads } from "@/hooks/useLeads";
 import { useBrokers } from "@/hooks/useBrokers";
 import { useProperties } from "@/hooks/useProperties";
 import { leadStatusMap, leadOriginMap, formatCurrency } from "@/lib/mappers";
-import { toast } from "sonner";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-
-// Extensão de tipo para autoTable
-declare module "jspdf" {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: {
-      finalY: number;
-    };
-  }
-}
 
 export default function Reports() {
   const [period, setPeriod] = useState("monthly");
@@ -212,206 +198,6 @@ export default function Reports() {
     });
   }, [leads, properties, period]);
 
-  const handleExportPDF = () => {
-    try {
-      const doc = new jsPDF();
-      let yPos = 20;
-      
-      // Configurações do PDF
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 20;
-      
-      // Título
-      doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.text("Relatório de Desempenho", margin, yPos);
-      yPos += 10;
-      
-      // Data de geração
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      const now = new Date();
-      const day = String(now.getDate()).padStart(2, "0");
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const year = now.getFullYear();
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-      const dateStr = `${day}/${month}/${year} ${hours}:${minutes}`;
-      doc.text(`Gerado em: ${dateStr}`, margin, yPos);
-      yPos += 15;
-      
-      // Período selecionado
-      const periodLabels: Record<string, string> = {
-        weekly: "Semanal",
-        monthly: "Mensal",
-        quarterly: "Trimestral",
-        yearly: "Anual"
-      };
-      doc.text(`Período: ${periodLabels[period] || "Mensal"}`, margin, yPos);
-      yPos += 10;
-      
-      // Métricas principais
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Métricas Principais", margin, yPos);
-      yPos += 8;
-      
-      const metrics = [
-        ["Receita Total", totalRevenue > 1000000 
-          ? `R$ ${(totalRevenue / 1000000).toFixed(1)}M`
-          : formatCurrency(totalRevenue)],
-        ["Negócios Fechados", totalDeals.toString()],
-        ["Total de Leads", totalLeads.toString()],
-        ["Taxa de Conversão", `${conversionRate}%`]
-      ];
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      metrics.forEach(([label, value]) => {
-        doc.text(`${label}: ${value}`, margin + 5, yPos);
-        yPos += 7;
-      });
-      yPos += 5;
-      
-      // Funil de Vendas
-      if (salesFunnelData.length > 0) {
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Funil de Vendas", margin, yPos);
-        yPos += 8;
-        
-        const funnelTableData = salesFunnelData.map(item => [
-          item.name,
-          item.value.toString(),
-          `${item.conversion}%`
-        ]);
-        
-        doc.autoTable({
-          startY: yPos,
-          head: [["Etapa", "Quantidade", "Taxa de Conversão"]],
-          body: funnelTableData,
-          theme: "striped",
-          headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 9 }
-        });
-        
-        yPos = doc.lastAutoTable.finalY + 10;
-      }
-      
-      // Origem dos Leads
-      if (sourceData.length > 0) {
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Origem dos Leads", margin, yPos);
-        yPos += 8;
-        
-        const totalOriginLeads = sourceData.reduce((sum, item) => sum + item.value, 0);
-        const originTableData = sourceData.map(item => [
-          item.name,
-          item.value.toString(),
-          `${((item.value / totalOriginLeads) * 100).toFixed(1)}%`
-        ]);
-        
-        doc.autoTable({
-          startY: yPos,
-          head: [["Origem", "Quantidade", "Percentual"]],
-          body: originTableData,
-          theme: "striped",
-          headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 9 }
-        });
-        
-        yPos = doc.lastAutoTable.finalY + 10;
-      }
-      
-      // Desempenho Mensal
-      if (monthlyPerformanceData.length > 0) {
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Desempenho Mensal", margin, yPos);
-        yPos += 8;
-        
-        const monthlyTableData = monthlyPerformanceData.map(item => [
-          item.month,
-          item.leads.toString(),
-          item.deals.toString(),
-          formatCurrency(item.revenue)
-        ]);
-        
-        doc.autoTable({
-          startY: yPos,
-          head: [["Mês", "Leads", "Negócios", "Receita"]],
-          body: monthlyTableData,
-          theme: "striped",
-          headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 9 }
-        });
-        
-        yPos = doc.lastAutoTable.finalY + 10;
-      }
-      
-      // Ranking de Corretores
-      if (brokerRankingData.length > 0) {
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Ranking de Corretores", margin, yPos);
-        yPos += 8;
-        
-        const brokerTableData = brokerRankingData.map((broker, index) => [
-          `${index + 1}º`,
-          broker.name,
-          broker.deals.toString(),
-          broker.revenue > 0 
-            ? broker.revenue > 1000000
-              ? `R$ ${(broker.revenue / 1000000).toFixed(2)}M`
-              : formatCurrency(broker.revenue)
-            : "N/A"
-        ]);
-        
-        doc.autoTable({
-          startY: yPos,
-          head: [["Posição", "Nome", "Negócios", "Receita"]],
-          body: brokerTableData,
-          theme: "striped",
-          headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 9 }
-        });
-      }
-      
-      // Salvar PDF
-      const fileName = `Relatorio_${dateStr.replace(/\//g, "-").replace(/:/g, "-").replace(/\s/g, "_")}.pdf`;
-      doc.save(fileName);
-      toast.success("PDF gerado com sucesso!");
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      toast.error("Erro ao gerar o PDF. Verifique o console para mais detalhes.");
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -434,10 +220,6 @@ export default function Reports() {
               <SelectItem value="yearly">Anual</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
-            <Download className="h-4 w-4" />
-            Exportar PDF
-          </Button>
         </div>
       </div>
 
